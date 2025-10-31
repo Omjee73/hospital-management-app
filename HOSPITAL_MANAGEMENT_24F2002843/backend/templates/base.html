@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Hospital Management System{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="/static/style.css">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    {% block content %}{% endblock %}
+
+        <!-- Provide global Vue on all pages (with CDN fallback) -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script>
+    // Fallback: if Vue failed to load from unpkg, try jsDelivr
+    if (!window.Vue) {
+        (function(){
+            var s = document.createElement('script');
+            s.src = 'https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js';
+            s.async = false;
+            s.onload = function(){ /* Vue loaded via fallback */ };
+            s.onerror = function(){ console.error('[base] Failed to load Vue from both CDNs'); };
+            document.head.appendChild(s);
+        })();
+    }
+    </script>
+    <!-- Bootstrap bundle for Modal, Toasts, etc. required by some inline pages -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Chart.js for dashboards -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+            <!-- Minimal fetch helper exposed as `http` -->
+            <script>
+            (function(){
+                function toQuery(params){
+                    const usp = new URLSearchParams();
+                    Object.entries(params || {}).forEach(([k,v])=>{ if (v!==undefined && v!==null) usp.append(k, v); });
+                    const s = usp.toString();
+                    return s ? ('?' + s) : '';
+                }
+                async function req(method, url, { params, data, headers } = {}){
+                    const opts = { method, headers: Object.assign({ 'Content-Type': 'application/json' }, headers || {}), credentials: 'include' };
+                    const fullUrl = url + (params ? toQuery(params) : '');
+                    if (data !== undefined) opts.body = (opts.headers['Content-Type'] || '').includes('application/json') ? JSON.stringify(data) : data;
+                    const res = await fetch(fullUrl, opts);
+                    const ct = res.headers.get('content-type')||'';
+                    const payload = ct.includes('application/json') ? await res.json().catch(()=>null) : await res.text();
+                    if (!res.ok) {
+                        const err = new Error('HTTP ' + res.status);
+                        err.response = { status: res.status, data: payload };
+                        throw err;
+                    }
+                    return { status: res.status, data: payload };
+                }
+                window.http = {
+                    get: (u, cfg) => req('GET', u, cfg),
+                    delete: (u, cfg) => req('DELETE', u, cfg),
+                    post: (u, data, cfg) => req('POST', u, Object.assign({}, cfg, { data })),
+                    put: (u, data, cfg) => req('PUT', u, Object.assign({}, cfg, { data }))
+                };
+            })();
+            </script>
+
+    <!-- Page-specific JS/CSS (optional, for per-page assets) -->
+    {% block page_assets %}{% endblock %}
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

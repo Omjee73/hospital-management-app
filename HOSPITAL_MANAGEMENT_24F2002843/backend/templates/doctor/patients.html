@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div id="app" v-cloak>
+    {% raw %}
+    <div class="container-fluid">
+        <div class="row">
+            <nav class="col-md-2 d-md-block bg-light sidebar">
+                <div class="position-sticky pt-3">
+                    <h5 class="px-3"><i class="bi bi-hospital"></i> HMS Doctor</h5>
+                    <ul class="nav flex-column">
+                        <li class="nav-item"><a class="nav-link" href="/doctor/dashboard"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
+                        <li class="nav-item"><a class="nav-link active" href="/doctor/patients"><i class="bi bi-people"></i> Patients</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/doctor/treatment"><i class="bi bi-clipboard-pulse"></i> Treatment</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/doctor/availability"><i class="bi bi-clock"></i> Availability</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/doctor/profile"><i class="bi bi-person-circle"></i> Profile</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/logout"><i class="bi bi-box-arrow-right"></i> Logout</a></li>
+                    </ul>
+                </div>
+            </nav>
+
+            <main class="col-md-10 ms-sm-auto px-md-4">
+                <div class="pt-3 pb-2 mb-3 border-bottom"><h1 class="h2">My Patients</h1></div>
+
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr><th>Name</th><th>Email</th><th>Contact</th><th>Blood Group</th><th>Action</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="patient in patients" :key="patient.id">
+                                <td>{{ patient.name }}</td>
+                                <td>{{ patient.email }}</td>
+                                <td>{{ patient.contact }}</td>
+                                <td>{{ patient.blood_group || 'N/A' }}</td>
+                                <td>
+                                    <button class="btn btn-sm btn-primary" @click="openView(patient)"><i class="bi bi-eye"></i> View</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- View Patient Modal -->
+                <div class="modal" :class="{ 'show d-block': showModal }" tabindex="-1">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Patient Details</h5>
+                                <button type="button" class="btn-close" @click="closeModal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div v-if="selectedPatient">
+                                    <div class="mb-3">
+                                        <strong>Name:</strong> {{ selectedPatient.name }}<br>
+                                        <strong>Email:</strong> {{ selectedPatient.email }}<br>
+                                        <strong>Contact:</strong> {{ selectedPatient.contact }}<br>
+                                        <strong>Blood Group:</strong> {{ selectedPatient.blood_group || 'N/A' }}
+                                    </div>
+                                    <hr>
+                                    <h6>Appointments with you</h6>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm">
+                                            <thead>
+                                                <tr><th>Date</th><th>Time</th><th>Status</th><th>Diagnosis</th></tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr v-for="apt in history" :key="apt.id">
+                                                    <td>{{ apt.date }}</td>
+                                                    <td>{{ apt.time }}</td>
+                                                    <td><span :class="apt.status === 'Completed' ? 'badge bg-success' : 'badge bg-secondary'">{{ apt.status }}</span></td>
+                                                    <td>{{ apt.treatment?.diagnosis || '-' }}</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button class="btn btn-secondary" @click="closeModal">Close</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+    {% endraw %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const { createApp } = Vue;
+createApp({
+    data() {
+        return { patients: [], showModal: false, selectedPatient: null, history: [] }
+    },
+    mounted() {
+        this.loadPatients();
+    },
+    methods: {
+        async loadPatients() {
+            const response = await http.get('/doctor/api/patients');
+            this.patients = response.data;
+        },
+        async openView(patient) {
+            this.selectedPatient = patient;
+            this.showModal = true;
+            try {
+                const res = await http.get(`/doctor/api/patients/${patient.id}/history`);
+                this.history = res.data || [];
+            } catch (e) {
+                this.history = [];
+            }
+        },
+        closeModal() {
+            this.showModal = false;
+            this.selectedPatient = null;
+            this.history = [];
+        }
+    }
+}).mount('#app');
+</script>
+{% endblock %}

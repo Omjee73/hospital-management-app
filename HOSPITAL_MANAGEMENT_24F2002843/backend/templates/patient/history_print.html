@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block extra_css %}{% endblock %}
+
+{% block content %}
+<div class="print-container">
+  <div class="d-flex justify-content-between align-items-center print-header">
+    <h3 class="m-0">Medical Visit Summary</h3>
+    <button class="btn btn-primary no-print" onclick="window.print()"><i class="bi bi-printer"></i> Print</button>
+  </div>
+
+  <div class="row g-2">
+    <div class="col-md-6"><span class="print-label">Patient:</span> {{ appt.patient.user.name }}</div>
+    <div class="col-md-6"><span class="print-label">Doctor:</span> {{ appt.doctor.user.name }} ({{ appt.doctor.specialization }})</div>
+    <div class="col-md-6"><span class="print-label">Consultation Fee:</span> ₹{{ appt.doctor.fee or 0 }}</div>
+    <div class="col-md-6"><span class="print-label">Date:</span> {{ appt.date.strftime('%Y-%m-%d') }}</div>
+    <div class="col-md-6"><span class="print-label">Time:</span> {{ appt.time.strftime('%H:%M') }}</div>
+    <div class="col-md-6"><span class="print-label">Status:</span> {{ appt.status }}</div>
+  </div>
+
+  <hr/>
+  <div class="mb-3">
+    <div class="label">Diagnosis</div>
+    <div class="border rounded p-2 bg-light">{{ (appt.treatment.diagnosis if appt.treatment and appt.treatment.diagnosis else 'N/A') }}</div>
+  </div>
+
+  <div class="mb-3">
+    <div class="label">Prescription</div>
+    <div class="border rounded p-2 bg-light">{{ (appt.treatment.prescription if appt.treatment and appt.treatment.prescription else 'N/A') }}</div>
+  </div>
+
+  <div class="mb-3">
+    <div class="label">Notes</div>
+    <div class="border rounded p-2 bg-light">{{ (appt.treatment.notes if appt.treatment and appt.treatment.notes else 'N/A') }}</div>
+  </div>
+</div>
+{% endblock %}

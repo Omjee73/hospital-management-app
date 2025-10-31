@@ -1,0 +1,272 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div id="app" v-cloak>
+    {% raw %}
+    <div class="container-fluid">
+        <div class="row">
+            <nav class="col-md-2 d-md-block bg-light sidebar">
+                <div class="position-sticky pt-3">
+                    <h5 class="px-3"><i class="bi bi-hospital"></i> HMS Doctor</h5>
+                    <ul class="nav flex-column">
+                        <li class="nav-item"><a class="nav-link" href="/doctor/dashboard"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/doctor/patients"><i class="bi bi-people"></i> Patients</a></li>
+                        <li class="nav-item"><a class="nav-link active" href="/doctor/treatment"><i class="bi bi-clipboard-pulse"></i> Treatment</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/doctor/availability"><i class="bi bi-clock"></i> Availability</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/doctor/profile"><i class="bi bi-person-circle"></i> Profile</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/logout"><i class="bi bi-box-arrow-right"></i> Logout</a></li>
+                    </ul>
+                </div>
+            </nav>
+
+            <main class="col-md-10 ms-sm-auto px-md-4">
+                <div class="pt-3 pb-2 mb-3 border-bottom"><h1 class="h2">Treatments</h1></div>
+
+                <div class="d-flex justify-content-end mb-3">
+                    <input type="text" class="form-control max-w-320" v-model.trim="query" placeholder="Search by patient or date/time">
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card h-100">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">Pending</h5>
+                                <span class="badge bg-secondary">{{ pending.length }}</span>
+                            </div>
+                            <div class="card-body">
+                                <div v-if="filteredPending.length === 0" class="text-muted">No pending appointments.</div>
+                                <ul class="list-group" v-else>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center" v-for="apt in filteredPending" :key="apt.id">
+                                        <div class="me-2">
+                                            <div><strong>{{ apt.patient_name }}</strong></div>
+                                            <small class="text-muted">{{ apt.date }} {{ apt.time }}</small><br/>
+                                            <small>Reason: {{ apt.reason || '-' }}</small>
+                                            <small v-if="apt.location" class="ms-2">Location: {{ apt.location }}</small>
+                                        </div>
+                                        <div class="btn-group">
+                                            <button class="btn btn-sm btn-primary" @click="openTreatment(apt)">Treatment</button>
+                                            <button class="btn btn-sm btn-outline-danger" @click="reject(apt)">Reject</button>
+                                        </div>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card h-100">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">Completed</h5>
+                                <span class="badge bg-success">{{ completed.length }}</span>
+                            </div>
+                            <div class="card-body">
+                                <div v-if="filteredCompleted.length === 0" class="text-muted">No completed treatments yet.</div>
+                                <ul class="list-group" v-else>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center" v-for="apt in filteredCompleted" :key="apt.id">
+                                        <div class="me-2">
+                                            <div><strong>{{ apt.patient_name }}</strong></div>
+                                            <small class="text-muted">{{ apt.date }} {{ apt.time }}</small><br/>
+                                            <small>Reason: {{ apt.reason || '-' }}</small>
+                                            <small v-if="apt.location" class="ms-2">Location: {{ apt.location }}</small>
+                                        </div>
+                                        <div class="btn-group">
+                                            <button class="btn btn-sm btn-outline-secondary" @click="openView(apt)">View</button>
+                                            <button class="btn btn-sm btn-primary" @click="openEdit(apt)">Edit</button>
+                                        </div>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">Rejected</h5>
+                                <span class="badge bg-danger">{{ rejected.length }}</span>
+                            </div>
+                            <div class="card-body">
+                                <div v-if="rejected.length === 0" class="text-muted">No rejected appointments.</div>
+                                <div class="table-responsive" v-else>
+                                    <table class="table table-striped align-middle">
+                                        <thead>
+                                            <tr>
+                                                <th>Patient</th>
+                                                <th>Date</th>
+                                                <th>Time</th>
+                                                <th>Reason</th>
+                                                <th>Location</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr v-for="apt in rejected" :key="apt.id">
+                                                <td>{{ apt.patient_name }}</td>
+                                                <td>{{ apt.date }}</td>
+                                                <td>{{ apt.time }}</td>
+                                                <td>{{ apt.reason || '-' }}</td>
+                                                <td>{{ apt.location || '-' }}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Treatment Modal -->
+                <div class="modal" :class="{ 'show d-block': showModal }" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">{{ viewing ? 'Treatment Details' : (activeAppointment && activeAppointment.status === 'Completed' ? 'Edit Treatment' : 'Add Treatment') }}</h5>
+                                <button type="button" class="btn-close" @click="closeModal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div v-if="activeAppointment">
+                                    <div class="mb-2">
+                                        <strong>Patient:</strong> {{ activeAppointment.patient_name }}<br>
+                                        <strong>When:</strong> {{ activeAppointment.date }} {{ activeAppointment.time }}
+                                    </div>
+                                    <div v-if="!viewing">
+                                        <div class="mb-3">
+                                            <label class="form-label">Diagnosis</label>
+                                            <textarea class="form-control" v-model="formData.diagnosis" rows="3"></textarea>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Prescription</label>
+                                            <textarea class="form-control" v-model="formData.prescription" rows="3"></textarea>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Notes</label>
+                                            <textarea class="form-control" v-model="formData.notes" rows="3"></textarea>
+                                        </div>
+                                    </div>
+                                    <div v-else>
+                                        <div class="mb-2"><strong>Diagnosis:</strong><br>{{ formData.diagnosis || '-' }}</div>
+                                        <div class="mb-2"><strong>Prescription:</strong><br>{{ formData.prescription || '-' }}</div>
+                                        <div class="mb-2"><strong>Notes:</strong><br>{{ formData.notes || '-' }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button class="btn btn-secondary" @click="closeModal">Close</button>
+                                <button v-if="!viewing" class="btn btn-primary" @click="saveTreatment">Save</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+    {% endraw %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const { createApp } = Vue;
+createApp({
+    data() {
+        return {
+            appointments: [],
+            pending: [],
+            completed: [],
+            rejected: [],
+            query: '',
+            showModal: false,
+            viewing: false,
+            activeAppointment: null,
+            formData: { diagnosis: '', prescription: '', notes: '' },
+        }
+    },
+    mounted() {
+        this.loadAppointments();
+    },
+    methods: {
+        async loadAppointments() {
+            const response = await http.get('/doctor/api/appointments');
+            this.appointments = response.data || [];
+            this.pending = this.appointments.filter(a => a.status === 'Booked');
+            this.completed = this.appointments.filter(a => a.status === 'Completed');
+            this.rejected = this.appointments.filter(a => a.status === 'Cancelled');
+        },
+        openTreatment(apt) {
+            this.viewing = false;
+            this.activeAppointment = apt;
+            this.formData = apt.treatment ? { ...apt.treatment } : { diagnosis: '', prescription: '', notes: '' };
+            this.showModal = true;
+        },
+        openView(apt) {
+            this.viewing = true;
+            this.activeAppointment = apt;
+            this.formData = apt.treatment ? { ...apt.treatment } : { diagnosis: '', prescription: '', notes: '' };
+            this.showModal = true;
+        },
+        openEdit(apt) {
+            this.viewing = false;
+            this.activeAppointment = apt;
+            this.formData = apt.treatment ? { ...apt.treatment } : { diagnosis: '', prescription: '', notes: '' };
+            this.showModal = true;
+        },
+        closeModal() {
+            this.showModal = false;
+            this.viewing = false;
+            this.activeAppointment = null;
+            this.formData = { diagnosis: '', prescription: '', notes: '' };
+        },
+        async saveTreatment() {
+            if (!this.activeAppointment) return;
+            const data = { ...this.formData, appointment_id: this.activeAppointment.id };
+            const response = await http.post('/doctor/api/treatment', data);
+            const updated = response.data && response.data.appointment ? response.data.appointment : null;
+            if (updated) {
+                // Update local arrays: move from pending to completed
+                this.pending = this.pending.filter(a => a.id !== updated.id);
+                this.completed = [{ ...updated }, ...this.completed.filter(a => a.id !== updated.id)];
+            } else {
+                // Fallback: reload
+                await this.loadAppointments();
+            }
+            this.closeModal();
+        },
+        async reject(apt) {
+            try {
+                await http.put(`/doctor/api/appointments/${apt.id}/status`, { status: 'Cancelled' });
+                // Move from pending to rejected
+                this.pending = this.pending.filter(a => a.id !== apt.id);
+                apt.status = 'Cancelled';
+                this.rejected = [apt, ...this.rejected];
+            } catch (e) {
+                console.error('Failed to reject', e);
+                await this.loadAppointments();
+            }
+        }
+    },
+    computed: {
+        filteredPending() {
+            const q = (this.query || '').toLowerCase();
+            if (!q) return this.pending;
+            return this.pending.filter(a =>
+                (a.patient_name || '').toLowerCase().includes(q) ||
+                (a.date || '').toLowerCase().includes(q) ||
+                (a.time || '').toLowerCase().includes(q) ||
+                (a.reason || '').toLowerCase().includes(q) ||
+                (a.location || '').toLowerCase().includes(q)
+            );
+        },
+        filteredCompleted() {
+            const q = (this.query || '').toLowerCase();
+            if (!q) return this.completed;
+            return this.completed.filter(a =>
+                (a.patient_name || '').toLowerCase().includes(q) ||
+                (a.date || '').toLowerCase().includes(q) ||
+                (a.time || '').toLowerCase().includes(q) ||
+                (a.reason || '').toLowerCase().includes(q) ||
+                (a.location || '').toLowerCase().includes(q)
+            );
+        }
+    }
+}).mount('#app');
+</script>
+{% endblock %}

@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div id="app" v-cloak>
+    {% raw %}
+    <div class="container-fluid">
+        <div class="row">
+            <nav class="col-md-2 d-md-block bg-light sidebar">
+                <div class="position-sticky pt-3">
+                    <h5 class="px-3"><i class="bi bi-hospital"></i> HMS Patient</h5>
+                    <ul class="nav flex-column">
+                        <li class="nav-item"><a class="nav-link" href="/patient/dashboard"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/patient/book-appointment"><i class="bi bi-calendar-plus"></i> Book Appointment</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/patient/appointments"><i class="bi bi-calendar-check"></i> My Appointments</a></li>
+                        <li class="nav-item"><a class="nav-link active" href="/patient/history"><i class="bi bi-clock-history"></i> Medical History</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/patient/profile"><i class="bi bi-person-circle"></i> Profile</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/logout"><i class="bi bi-box-arrow-right"></i> Logout</a></li>
+                    </ul>
+                </div>
+            </nav>
+
+            <main class="col-md-10 ms-sm-auto px-md-4">
+                <div class="pt-3 pb-2 mb-3 border-bottom d-flex justify-content-between">
+                    <h1 class="h2">Medical History</h1>
+                    <button type="button" class="btn btn-primary" @click.prevent.stop="exportHistory"><i class="bi bi-download"></i> Export to CSV</button>
+                </div>
+
+                <div v-if="message" :class="'alert alert-' + messageType">{{ message }}</div>
+
+                <div class="table-responsive">
+                    <table class="table table-striped align-middle">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Doctor</th>
+                                <th>Fee</th>
+                                <th>Diagnosis</th>
+                                <th>Prescription</th>
+                                <th>Notes</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="apt in history" :key="apt.id">
+                                <td>{{ apt.date }}</td>
+                                <td>{{ apt.doctor_name }}</td>
+                                <td>₹{{ apt.doctor_fee || 0 }}</td>
+                                <td>{{ apt.treatment?.diagnosis || 'N/A' }}</td>
+                                <td>{{ apt.treatment?.prescription || 'N/A' }}</td>
+                                <td>{{ apt.treatment?.notes || 'N/A' }}</td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-secondary me-1" @click="openView(apt)"><i class="bi bi-eye"></i> View</button>
+                                    <button class="btn btn-sm btn-outline-primary" @click="openPrint(apt)"><i class="bi bi-printer"></i> Print</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Details Modal -->
+                <div v-if="modal.show">
+                    <div class="modal-backdrop show"></div>
+                    <div class="modal d-block" tabindex="-1">
+                        <div class="modal-dialog modal-lg">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Visit Details</h5>
+                                    <button type="button" class="btn-close" @click="closeModal"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <div v-if="modal.data">
+                                        <div class="row g-3">
+                                            <div class="col-md-6"><strong>Date:</strong> {{ modal.data.date }}</div>
+                                            <div class="col-md-6"><strong>Time:</strong> {{ modal.data.time }}</div>
+                                            <div class="col-md-6"><strong>Doctor:</strong> {{ modal.data.doctor_name }} ({{ modal.data.doctor_specialization }})</div>
+                                            <div class="col-md-6"><strong>Status:</strong> {{ modal.data.status }}</div>
+                                            <div class="col-12"><hr/></div>
+                                            <div class="col-md-12"><strong>Diagnosis:</strong><div class="border rounded p-2 bg-light">{{ modal.data.treatment?.diagnosis || 'N/A' }}</div></div>
+                                            <div class="col-md-12"><strong>Prescription:</strong><div class="border rounded p-2 bg-light">{{ modal.data.treatment?.prescription || 'N/A' }}</div></div>
+                                            <div class="col-md-12"><strong>Notes:</strong><div class="border rounded p-2 bg-light">{{ modal.data.treatment?.notes || 'N/A' }}</div></div>
+                                        </div>
+                                    </div>
+                                    <div v-else class="text-muted">No details</div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" @click="closeModal">Close</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+    {% endraw %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const { createApp } = Vue;
+createApp({
+    data() {
+    return { history: [], message: '', messageType: '', modal: { show: false, data: null } }
+    },
+    mounted() {
+        this.loadHistory();
+    },
+    methods: {
+        async loadHistory() {
+            const response = await http.get('/patient/api/history');
+            this.history = response.data;
+        },
+        async exportHistory() {
+            try {
+                const response = await http.post('/patient/api/export-history');
+                this.message = 'Export started — CSV will be emailed to you.';
+                this.messageType = 'success';
+            } catch (error) {
+                this.message = 'Export failed';
+                this.messageType = 'danger';
+            }
+        },
+        openView(apt) {
+            this.modal = { show: true, data: apt };
+        },
+        closeModal() {
+            this.modal = { show: false, data: null };
+        },
+        openPrint(apt) {
+            const url = `/patient/history/print/${apt.id}`;
+            window.open(url, '_blank');
+        }
+    }
+}).mount('#app');
+</script>
+{% endblock %}

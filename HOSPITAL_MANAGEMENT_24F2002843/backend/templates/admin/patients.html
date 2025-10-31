@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div id="app" v-cloak>
+    {% raw %}
+    <div class="container-fluid">
+        <div class="row">
+            <nav class="col-md-2 d-md-block bg-light sidebar">
+                <div class="position-sticky pt-3">
+                    <h5 class="px-3"><i class="bi bi-hospital"></i> HMS Admin</h5>
+                    <ul class="nav flex-column">
+                        <li class="nav-item"><a class="nav-link" href="/admin/dashboard"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/admin/doctors"><i class="bi bi-person-badge"></i> Doctors</a></li>
+                        <li class="nav-item"><a class="nav-link active" href="/admin/patients"><i class="bi bi-people"></i> Patients</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/admin/appointments"><i class="bi bi-calendar-check"></i> Appointments</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/admin/profile"><i class="bi bi-person-circle"></i> Profile</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/logout"><i class="bi bi-box-arrow-right"></i> Logout</a></li>
+                    </ul>
+                </div>
+            </nav>
+
+            <main class="col-md-10 ms-sm-auto px-md-4">
+                <div class="pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2">Manage Patients</h1>
+                </div>
+
+                <div class="mb-3">
+                    <input type="text" class="form-control" v-model="searchQuery" @input="searchPatients" placeholder="Search by name, ID, or contact...">
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Contact</th>
+                                <th>Blood Group</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="patient in patients" :key="patient.id">
+                                <td>{{ patient.id }}</td>
+                                <td>{{ patient.name }}</td>
+                                <td>{{ patient.email }}</td>
+                                <td>{{ patient.contact }}</td>
+                                <td>{{ patient.blood_group || 'N/A' }}</td>
+                                <td>
+                                    <button class="btn btn-sm btn-primary" @click="openViewModal(patient)"><i class="bi bi-eye"></i></button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </main>
+        </div>
+    </div>
+    <!-- Patient View / Edit Modal moved inside #app so Vue controls its bindings -->
+    <div class="modal fade" id="patientViewModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Patient Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div v-if="message" :class="'alert alert-' + messageType">{{ message }}</div>
+                    <ul class="nav nav-tabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#patient-info" type="button" role="tab">Info</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#patient-history" type="button" role="tab">History</button>
+                        </li>
+                    </ul>
+                    <div class="tab-content pt-3">
+                        <div class="tab-pane fade show active" id="patient-info" role="tabpanel">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Name</label>
+                                    <input class="form-control" v-model="selectedPatient.name" disabled>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Email</label>
+                                    <input class="form-control" v-model="selectedPatient.email" disabled>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Contact</label>
+                                    <input class="form-control" v-model="selectedPatient.contact" disabled>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Blood Group</label>
+                                    <input class="form-control" v-model="selectedPatient.blood_group" disabled>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">Address</label>
+                                    <textarea class="form-control" v-model="selectedPatient.address" rows="2" disabled></textarea>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Emergency Contact</label>
+                                    <input class="form-control" v-model="selectedPatient.emergency_contact" disabled>
+                                </div>
+                                <div class="col-md-6 d-flex align-items-end">
+                                    <span class="me-2">Status:</span>
+                                    <span :class="selectedPatient.is_active ? 'badge bg-success' : 'badge bg-danger'">{{ selectedPatient.is_active ? 'Active' : 'Blocked' }}</span>
+                                </div>
+                            </div>
+                            <div class="d-flex justify-content-between mt-3">
+                                <button type="button" class="btn" :class="selectedPatient.is_active ? 'btn-danger' : 'btn-success'" @click="togglePatientStatus(selectedPatient)">
+                                    <i :class="selectedPatient.is_active ? 'bi bi-slash-circle' : 'bi bi-check-circle'"></i>
+                                    {{ selectedPatient.is_active ? 'Block' : 'Activate' }}
+                                </button>
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                            </div>
+                        </div>
+                        <div class="tab-pane fade" id="patient-history" role="tabpanel">
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Time</th>
+                                            <th>Doctor</th>
+                                            <th>Status</th>
+                                            <th>Diagnosis</th>
+                                            <th>Prescription</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="apt in patientHistory" :key="apt.id">
+                                            <td>{{ apt.date }}</td>
+                                            <td>{{ apt.time }}</td>
+                                            <td>{{ apt.doctor_name }}</td>
+                                            <td>{{ apt.status }}</td>
+                                            <td>{{ apt.treatment?.diagnosis || 'N/A' }}</td>
+                                            <td>{{ apt.treatment?.prescription || 'N/A' }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endraw %}
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const { createApp } = Vue;
+createApp({
+    data() {
+        return { patients: [], searchQuery: '', selectedPatient: {}, patientHistory: [], message: '', messageType: '' }
+    },
+    mounted() {
+        this.loadPatients();
+    },
+    methods: {
+        async loadPatients() {
+            const response = await http.get('/admin/api/patients');
+            this.patients = response.data;
+        },
+        async searchPatients() {
+            if (this.searchQuery) {
+                const response = await http.get(`/admin/search/patients?q=${this.searchQuery}`);
+                this.patients = response.data;
+            } else {
+                this.loadPatients();
+            }
+        },
+        async openViewModal(patient) {
+            this.selectedPatient = { ...patient };
+            this.patientHistory = [];
+            try {
+                const resp = await http.get(`/admin/api/patients/${patient.id}/history`);
+                this.patientHistory = resp.data;
+            } catch (e) { /* ignore */ }
+            const modalEl = new bootstrap.Modal(document.getElementById('patientViewModal'));
+            modalEl.show();
+        },
+        async togglePatientStatus(p) {
+            try {
+                const url = p.is_active ? `/admin/api/patients/${p.id}/block` : `/admin/api/patients/${p.id}/activate`;
+                const resp = await http.post(url);
+                this.selectedPatient.is_active = resp.data.patient.is_active;
+                this.message = resp.data.message || 'Updated';
+                this.messageType = 'success';
+                // reflect in list
+                this.patients = this.patients.map(x => x.id === p.id ? { ...x, is_active: this.selectedPatient.is_active } : x);
+            } catch (err) {
+                this.message = (err && err.response && err.response.data && err.response.data.message) ? err.response.data.message : 'Update failed';
+                this.messageType = 'danger';
+            }
+        }
+    }
+}).mount('#app');
+</script>
+{% endblock %}

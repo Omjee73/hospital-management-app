@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}Welcome - Hospital Management System{% endblock %}
+
+{% block content %}
+<div id="app">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="bi bi-hospital"></i> Hospital Management System
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/login">Login</a>
+                <a class="nav-link" href="/register">Register</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-5">
+        <div class="row justify-content-center">
+            <div class="col-md-8 text-center">
+                <h1 class="display-4 mb-4">Welcome to Our Hospital</h1>
+                <p class="lead mb-4">Quality Healthcare at Your Fingertips</p>
+                
+                <div class="row mt-5">
+                    <div class="col-md-4 mb-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <i class="bi bi-calendar-check fs-1 text-primary"></i>
+                                <h5 class="card-title mt-3">Book Appointments</h5>
+                                <p class="card-text">Schedule appointments with our specialists easily</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <i class="bi bi-person-badge fs-1 text-primary"></i>
+                                <h5 class="card-title mt-3">Expert Doctors</h5>
+                                <p class="card-text">Highly qualified and experienced medical professionals</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <i class="bi bi-clock-history fs-1 text-primary"></i>
+                                <h5 class="card-title mt-3">Medical History</h5>
+                                <p class="card-text">Access your complete treatment history anytime</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <a href="/register" class="btn btn-primary btn-lg me-2">Register as Patient</a>
+                    <a href="/login" class="btn btn-outline-primary btn-lg">Login</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

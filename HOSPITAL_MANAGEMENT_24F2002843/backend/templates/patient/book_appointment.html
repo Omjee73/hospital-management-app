@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div id="app" v-cloak>
+    {% raw %}
+    <div class="container-fluid">
+        <div class="row">
+            <nav class="col-md-2 d-md-block bg-light sidebar">
+                <div class="position-sticky pt-3">
+                    <h5 class="px-3"><i class="bi bi-hospital"></i> HMS Patient</h5>
+                    <ul class="nav flex-column">
+                        <li class="nav-item"><a class="nav-link" href="/patient/dashboard"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
+                        <li class="nav-item"><a class="nav-link active" href="/patient/book-appointment"><i class="bi bi-calendar-plus"></i> Book Appointment</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/patient/appointments"><i class="bi bi-calendar-check"></i> My Appointments</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/patient/history"><i class="bi bi-clock-history"></i> Medical History</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/patient/profile"><i class="bi bi-person-circle"></i> Profile</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/logout"><i class="bi bi-box-arrow-right"></i> Logout</a></li>
+                    </ul>
+                </div>
+            </nav>
+
+            <main class="col-md-10 ms-sm-auto px-md-4">
+                <div class="pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2">Book Appointment</h1>
+                    <p class="text-muted mb-0">Select a doctor and pick an available slot from their schedule (today + next 7 days).</p>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-md-8">
+                        <input type="text" class="form-control" v-model="searchQuery" @input="applyFilters" placeholder="Search by doctor name...">
+                    </div>
+                    <div class="col-md-4">
+                        <select class="form-select" v-model="selectedSpecialization" @change="applyFilters">
+                            <option value="">All Specializations</option>
+                            <option v-for="spec in specializations" :key="spec" :value="spec">{{ spec }}</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-body">
+                        <div v-if="message" :class="'alert alert-' + messageType">{{ message }}</div>
+                        
+                        <form @submit.prevent="bookAppointment">
+                            <div class="mb-3">
+                                <label class="form-label">Select Doctor</label>
+                                <select class="form-control" v-model="formData.doctor_id" @change="onDoctorChange" required>
+                                    <option value="">Select Doctor</option>
+                                    <option v-for="doctor in doctors" :key="doctor.id" :value="doctor.id">
+                                        {{ doctor.name }} - {{ doctor.specialization }} (Fee: ₹{{ formatFee(doctor.fee) }})
+                                    </option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Date</label>
+                                <input type="date" class="form-control" v-model="selectedDate" @change="onDateChange" :min="minDate" :max="maxDate" :disabled="!availability.length" required>
+                                <div class="form-text" v-if="availability.length === 0">Select a doctor to load available dates.</div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Available Slots</label>
+                                <div v-if="!selectedDate" class="text-muted">Select a date to view slots.</div>
+                                <div v-else>
+                                    <div v-if="slots.length === 0" class="alert alert-warning py-2">No slots available for this date. Please pick another date.</div>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <button type="button" class="btn"
+                                                :class="[
+                                                    slot.available ? 'btn-outline-primary' : 'btn-outline-secondary disabled',
+                                                    (selectedSlotTime === slot.time && slot.available) ? 'active' : ''
+                                                ]"
+                                                v-for="slot in slots" :key="slot.time"
+                                                @click="selectSlot(slot)"
+                                                :disabled="!slot.available">
+                                            {{ slot.time }}
+                                        </button>
+                                    </div>
+                                    <div v-if="selectedSlotTime" class="form-text mt-2">Selected time: {{ selectedSlotTime }}</div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Reason for Visit</label>
+                                <textarea class="form-control" v-model="formData.reason" rows="3"></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary" :disabled="!canBook">Book Appointment</button>
+                        </form>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+    {% endraw %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const { createApp } = Vue;
+createApp({
+    data() {
+        return {
+            allDoctors: [],
+            doctors: [],
+            formData: { doctor_id: '', date: '', time: '', reason: '' },
+            searchQuery: '',
+            specializations: [],
+            selectedSpecialization: '',
+            message: '',
+            messageType: '',
+            availability: [],
+            selectedDate: '',
+            slots: [],
+            selectedSlotTime: ''
+        }
+    },
+    mounted() {
+        this.loadDoctors();
+        // attempt to preselect doctor from query string
+        try {
+            const params = new URLSearchParams(window.location.search);
+            const did = params.get('doctor_id');
+            if (did) {
+                // wait a tick to let doctors load then select
+                const sel = () => {
+                    const found = this.allDoctors.find(d => String(d.id) === String(did));
+                    if (found) {
+                        this.formData.doctor_id = found.id;
+                        this.onDoctorChange();
+                    } else {
+                        setTimeout(sel, 100);
+                    }
+                };
+                setTimeout(sel, 100);
+            }
+        } catch (e) {}
+    },
+    methods: {
+        async loadDoctors() {
+            const response = await http.get('/patient/api/doctors');
+            this.allDoctors = response.data;
+            // Build unique specialization list
+            const set = new Set(this.allDoctors.map(d => d.specialization).filter(Boolean));
+            this.specializations = Array.from(set).sort();
+            this.applyFilters();
+        },
+        applyFilters() {
+            const nameQ = (this.searchQuery || '').trim().toLowerCase();
+            const spec = (this.selectedSpecialization || '').trim().toLowerCase();
+            this.doctors = this.allDoctors.filter(d => {
+                const nameMatch = !nameQ || (d.name || '').toLowerCase().includes(nameQ);
+                const specMatch = !spec || (d.specialization || '').toLowerCase() === spec;
+                return nameMatch && specMatch;
+            });
+        },
+        formatFee(v){ try { const n = parseInt(v||0,10); return isNaN(n)? 0 : n; } catch(e){ return 0; } },
+        onDoctorChange() {
+            this.availability = [];
+            this.selectedDate = '';
+            this.slots = [];
+            this.selectedSlotTime = '';
+            if (this.formData.doctor_id) this.loadAvailability();
+        },
+        onDateChange() {
+            // clear current selection when date changes and load fresh slots
+            this.selectedSlotTime = '';
+            this.formData.time = '';
+            this.formData.date = this.selectedDate || '';
+            this.loadSlots();
+        },
+    async loadAvailability() {
+            try {
+        const res = await http.get(`/patient/api/doctors/${this.formData.doctor_id}/availability`);
+                this.availability = res.data || [];
+                // Auto-select the first date if available
+                if (this.availability.length) {
+                    this.selectedDate = this.availability[0].date;
+                    await this.loadSlots();
+                }
+            } catch (e) {
+                this.availability = [];
+            }
+        },
+        async loadSlots() {
+            this.slots = [];
+            this.selectedSlotTime = '';
+            this.formData.time = '';
+            if (!this.selectedDate || !this.formData.doctor_id) return;
+            try {
+                const res = await http.get(`/patient/api/doctors/${this.formData.doctor_id}/slots`, { params: { date: this.selectedDate } });
+                this.slots = (res.data && res.data.slots) ? res.data.slots : [];
+            } catch (e) {
+                this.slots = [];
+            }
+        },
+        selectSlot(slot) {
+            if (!slot.available) return;
+            this.formData.date = this.selectedDate;
+            this.formData.time = slot.time;
+            this.selectedSlotTime = slot.time;
+        },
+        async bookAppointment() {
+            try {
+                const response = await http.post('/patient/api/appointments', this.formData);
+                this.message = response.data.message;
+                this.messageType = 'success';
+                this.formData = { doctor_id: '', date: '', time: '', reason: '' };
+                this.availability = [];
+                this.selectedDate = '';
+                this.slots = [];
+                this.selectedSlotTime = '';
+            } catch (error) {
+                this.message = (error && error.response && error.response.data && error.response.data.message) ? error.response.data.message : 'Booking failed';
+                this.messageType = 'danger';
+            }
+        }
+    },
+    computed: {
+        minDate() {
+            const today = new Date();
+            return today.toISOString().split('T')[0];
+        },
+        maxDate() {
+            const d = new Date();
+            d.setDate(d.getDate() + 7);
+            return d.toISOString().split('T')[0];
+        },
+        canBook() {
+            return !!(this.formData.doctor_id && this.selectedDate && this.selectedSlotTime);
+        }
+    }
+}).mount('#app');
+</script>
+{% endblock %}

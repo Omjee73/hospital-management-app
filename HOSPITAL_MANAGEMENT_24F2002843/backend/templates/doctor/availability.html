@@ -1,0 +1,386 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div id="app" v-cloak>
+    {% raw %}
+    <div class="container-fluid">
+        <div class="row">
+            <nav class="col-md-2 d-md-block bg-light sidebar">
+                <div class="position-sticky pt-3">
+                    <h5 class="px-3"><i class="bi bi-hospital"></i> HMS Doctor</h5>
+                    <ul class="nav flex-column">
+                        <li class="nav-item"><a class="nav-link" href="/doctor/dashboard"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/doctor/patients"><i class="bi bi-people"></i> Patients</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/doctor/treatment"><i class="bi bi-clipboard-pulse"></i> Treatment</a></li>
+                        <li class="nav-item"><a class="nav-link active" href="/doctor/availability"><i class="bi bi-clock"></i> Availability</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/doctor/profile"><i class="bi bi-person-circle"></i> Profile</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/logout"><i class="bi bi-box-arrow-right"></i> Logout</a></li>
+                    </ul>
+                </div>
+            </nav>
+
+            <main class="col-md-10 ms-sm-auto px-md-4">
+                <div class="pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2">Manage Availability</h1>
+                    <p class="text-muted mb-0">Set your availability; patients can book slots from the selected date through the next 7 days.</p>
+                </div>
+
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <h5>Set Availability</h5>
+                        <form @submit.prevent="setAvailability">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label class="form-label">Date</label>
+                                    <input type="date" class="form-control" v-model="formData.date" :min="todayStr" required>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Start Time</label>
+                                    <input type="time" class="form-control" v-model="formData.start_time" required>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">End Time</label>
+                                    <input type="time" class="form-control" v-model="formData.end_time" required>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Duration (mins)</label>
+                                    <input type="number" class="form-control" v-model.number="formData.duration_minutes" min="5" step="5" required>
+                                </div>
+                                <div class="col-md-4 d-flex align-items-end">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="apply7days" v-model="applyToNextDays">
+                                        <label class="form-check-label" for="apply7days">
+                                            Apply to next 7 days
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-3">
+                                    <label class="form-label">&nbsp;</label>
+                                    <button type="submit" class="btn btn-primary w-100">Add</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                                <!-- Date-wise slots view (moved right under Set Availability) -->
+                                <div class="card mt-3">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center gap-2 mb-3">
+                            <label class="form-label mb-0">View slots for</label>
+                            <select class="form-select max-w-260" v-model="slotsDate" @change="loadSlotsDirect">
+                                <option disabled value="">-- select date --</option>
+                                <option v-for="d in availabilityDates" :key="d" :value="d">{{ d }}</option>
+                            </select>
+                            <span v-if="slotsDate && slotsInfo">Duration: {{ slotsInfo.duration_minutes }} mins</span>
+                                            <button v-if="slotsDate" class="btn btn-outline-danger ms-auto" @click="deleteAvailabilityByDate()">Delete this date</button>
+                        </div>
+                        <div v-if="!slotsDate" class="text-muted">Select a date from your availability to view slot-by-slot status.</div>
+                        <div v-else>
+                            <div class="d-flex justify-content-end mb-2" v-if="slotsList && slotsList.length">
+                                <small class="text-muted">
+                                    {{ slotsList.filter(s => !s.available).length }} / {{ slotsList.length }} slots booked
+                                </small>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Time</th>
+                                            <th>Booked By</th>
+                                            <th>Reason</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="s in slotsList" :key="s.time">
+                                            <td>{{ s.time }}</td>
+                                            <td>{{ s.patient_name || '-' }}</td>
+                                            <td>{{ s.reason || '-' }}</td>
+                                            <td>
+                                                <span :class="s.available ? 'badge bg-success' : 'badge bg-secondary'">
+                                                    {{ s.available ? 'Available' : (s.status || 'Booked') }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <!-- Show Delete only when slot is free; Show Shift/View only when booked -->
+                                                <template v-if="s.available">
+                                                    <button class="btn btn-sm btn-outline-danger me-1" @click="deleteAppt(s)">Delete</button>
+                                                </template>
+                                                <template v-else>
+                                                    <button class="btn btn-sm btn-outline-primary me-1" :disabled="!globalHasFreeSlots" :title="!globalHasFreeSlots ? 'No free slots in your availability' : ''" @click="openShift(s)">Shift</button>
+                                                    <button class="btn btn-sm btn-outline-secondary" @click="viewAppt(s)">View</button>
+                                                </template>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Simple Vue-driven modal for Shift/View -->
+                <div v-if="modal.show">
+                    <div class="modal-backdrop show"></div>
+                    <div class="modal d-block" tabindex="-1">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">{{ modal.title }}</h5>
+                                    <button type="button" class="btn-close" @click="closeModal"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <div v-if="modal.action === 'view'">
+                                        <div class="mb-2"><strong>Date:</strong> {{ (modal.body && modal.body.date) || slotsDate }}</div>
+                                        <div class="mb-2"><strong>Time:</strong> {{ modal.body && modal.body.time }}</div>
+                                        <div class="mb-2"><strong>Patient:</strong> {{ modal.body && (modal.body.patient_name || '-') }}</div>
+                                        <div class="mb-2"><strong>Reason:</strong> {{ modal.body && (modal.body.reason || '-') }}</div>
+                                        <div class="mb-2"><strong>Location:</strong> {{ modal.body && (modal.body.location || '-') }}</div>
+                                        <div class="mb-2"><strong>Status:</strong> {{ modal.body && (modal.body.status || 'Booked') }}</div>
+                                    </div>
+                                    <div v-else-if="modal.action === 'shift'">
+                                        <div class="mb-3">
+                                            <label class="form-label">Select new time</label>
+                                            <select class="form-select" v-model="selectedTime">
+                                                <option disabled value="">-- choose --</option>
+                                                <option v-for="t in shiftOptions" :key="t" :value="t">{{ t }}</option>
+                                            </select>
+                                            <div class="form-text">Only currently free slots are listed.</div>
+                                        </div>
+                                        <div v-if="shiftMessage" class="alert alert-warning py-2">{{ shiftMessage }}</div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Or choose another date</label>
+                                            <select class="form-select" v-model="selectedDateForShift" @change="onShiftDateChange">
+                                                <option disabled value="">-- select date --</option>
+                                                <option v-for="d in availabilityDates" :key="d" :value="d">{{ d }}</option>
+                                            </select>
+                                            <small class="text-muted">After selecting another date, pick a time from its free slots.</small>
+                                        </div>
+                                    </div>
+                                    <div v-else>
+                                        <p class="text-muted mb-0">No content</p>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" @click="closeModal">Close</button>
+                                    <button v-if="modal.action === 'shift'" type="button" class="btn btn-primary" :disabled="!selectedTime" @click="confirmShift(selectedTime)">Confirm Shift</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+    {% endraw %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const { createApp } = Vue;
+createApp({
+    data() {
+    return { availability: [], formData: { date: '', start_time: '', end_time: '', duration_minutes: 30 }, slotsDate: '', slotsList: [], slotsInfo: null, modal: { show: false, title: '', body: '', action: null }, shiftOptions: [], selectedTime: '', selectedDateForShift: '', shiftMessage: '', availabilityDates: [], applyToNextDays: true, todayStr: '', globalHasFreeSlots: true }
+    },
+    mounted() {
+        const d = new Date();
+        const m = String(d.getMonth()+1).padStart(2,'0');
+        const day = String(d.getDate()).padStart(2,'0');
+        this.todayStr = `${d.getFullYear()}-${m}-${day}`;
+        this.loadAvailability();
+    },
+    methods: {
+        async loadAvailability() {
+            const response = await http.get('/doctor/api/availability');
+            this.availability = response.data;
+            // unique and sorted dates
+            const dates = (this.availability || []).map(a => a.date);
+            this.availabilityDates = Array.from(new Set(dates)).sort();
+            // update global free slots flag
+            await this.updateGlobalFreeSlots();
+            if (!this.slotsDate && this.availabilityDates.length) {
+                this.slotsDate = this.availabilityDates[0];
+                await this.loadSlotsDirect();
+            } else if (this.slotsDate && !this.availabilityDates.includes(this.slotsDate) && this.availabilityDates.length) {
+                // previously selected date disappeared; fallback to first
+                this.slotsDate = this.availabilityDates[0];
+                await this.loadSlotsDirect();
+            }
+        },
+        async loadSlotsForDate(dateStr) {
+            this.slotsDate = dateStr;
+            await this.loadSlotsDirect();
+        },
+        async loadSlotsDirect() {
+            if (!this.slotsDate) return;
+            const res = await http.get('/doctor/api/slots', { params: { date: this.slotsDate } });
+            this.slotsInfo = res.data || null;
+            this.slotsList = (res.data && res.data.slots) ? res.data.slots : [];
+            // recompute global flag after load
+            await this.updateGlobalFreeSlots();
+        },
+        async updateGlobalFreeSlots() {
+            // Check if any free slots exist across availabilityDates; limit to first 30 dates to keep it light
+            const dates = this.availabilityDates.slice(0, 30);
+            if (!dates.length) { this.globalHasFreeSlots = false; return; }
+            try {
+                // probe sequentially until a free slot is found
+                this.globalHasFreeSlots = false;
+                for (const d of dates) {
+                    const res = await http.get('/doctor/api/slots', { params: { date: d } });
+                    const slots = (res.data && res.data.slots) ? res.data.slots : [];
+                    if (slots.some(s => s.available)) { this.globalHasFreeSlots = true; break; }
+                }
+            } catch (e) {
+                console.error(e);
+                this.globalHasFreeSlots = true; // don’t block shift due to transient error
+            }
+        },
+        async deleteAppt(slot) {
+            try {
+                if (slot.appointment_id) {
+                    // Booked slot: cancel appointment
+                    await http.put(`/doctor/api/appointments/${slot.appointment_id}/status`, { status: 'Cancelled' });
+                } else {
+                    // Free slot: remove this time from availability for the current date
+                    if (!this.slotsDate || !slot.time) return;
+                    await http.delete('/doctor/api/slots', { params: { date: this.slotsDate, time: slot.time } });
+                }
+                await this.loadSlotsDirect();
+                // also refresh dates since availability might have changed (edge case: last slot removed)
+                await this.loadAvailability();
+            } catch (e) {
+                console.error(e);
+                const msg = (e && e.response && e.response.data && e.response.data.message) || 'Unable to delete';
+                alert(msg);
+            }
+        },
+        openShift(slot) {
+            // Offer remaining available slots of the same day
+            this.shiftOptions = this.slotsList.filter(s => s.available).map(s => s.time);
+            this.selectedDateForShift = this.slotsDate;
+            this.shiftMessage = this.shiftOptions.length ? '' : 'No free slots left today. Choose another date below.';
+            this.modal = { show: true, title: 'Shift Appointment', body: slot, action: 'shift' };
+        },
+        async onShiftDateChange() {
+            this.selectedTime = '';
+            this.shiftOptions = [];
+            this.shiftMessage = '';
+            if (!this.selectedDateForShift) return;
+            try {
+                const res = await http.get('/doctor/api/slots', { params: { date: this.selectedDateForShift } });
+                const slots = (res.data && res.data.slots) ? res.data.slots : [];
+                this.shiftOptions = slots.filter(s => s.available).map(s => s.time);
+                if (!this.shiftOptions.length) {
+                    this.shiftMessage = 'No free slots available on the selected date.';
+                }
+            } catch (e) {
+                console.error(e);
+                this.shiftMessage = 'Failed to load slots for the selected date.';
+            }
+        },
+        async confirmShift(newTime) {
+            if (!this.modal.body || !this.modal.body.appointment_id) return;
+            try {
+                const payload = { time: newTime };
+                if (this.selectedDateForShift && this.selectedDateForShift !== this.slotsDate) {
+                    payload.date = this.selectedDateForShift;
+                }
+                await http.put(`/doctor/api/appointments/${this.modal.body.appointment_id}/reschedule`, payload);
+                this.modal.show = false;
+                this.selectedTime = '';
+                this.selectedDateForShift = '';
+                if (payload.date) {
+                    this.slotsDate = payload.date;
+                }
+                await this.loadSlotsDirect();
+            } catch (e) {
+                console.error(e);
+                alert('Unable to shift appointment');
+            }
+        },
+        async viewAppt(slot) {
+            try {
+                if (!slot.appointment_id) return;
+                const res = await http.get(`/doctor/api/appointments/${slot.appointment_id}`);
+                const appt = res.data || {};
+                this.modal = { show: true, title: 'Appointment Details', body: { ...slot, patient_name: appt.patient_name, reason: appt.reason, status: appt.status, location: appt.location, date: appt.date }, action: 'view' };
+            } catch(e) {
+                console.error(e);
+                alert('Failed to load appointment details');
+            }
+        },
+        closeModal() {
+            this.modal.show = false;
+            this.selectedTime = '';
+            this.selectedDateForShift = '';
+        },
+        async deleteAvailabilityByDate() {
+            if (!this.slotsDate) return;
+            if (!confirm(`Delete availability for ${this.slotsDate}? This requires no booked/completed slots.`)) return;
+            try {
+                await http.delete('/doctor/api/availability/by-date', { params: { date: this.slotsDate } });
+                await this.loadAvailability();
+                if (this.availabilityDates.length) {
+                    this.slotsDate = this.availabilityDates[0];
+                    await this.loadSlotsDirect();
+                } else {
+                    this.slotsDate = '';
+                    this.slotsList = [];
+                    this.slotsInfo = null;
+                }
+            } catch (e) {
+                console.error(e);
+                alert((e && e.response && e.response.data && e.response.data.message) || 'Failed to delete date');
+            }
+        },
+        async setAvailability() {
+            // Validate duration and time window
+            const dur = parseInt(this.formData.duration_minutes, 10);
+            if (!dur || dur <= 0) {
+                alert('Please enter a valid duration in minutes (e.g., 10, 15, 20).');
+                return;
+            }
+            const toMinutes = (hhmm) => {
+                const [hh, mm] = String(hhmm || '').split(':').map(Number);
+                return (hh * 60) + (mm || 0);
+            };
+            const startM = toMinutes(this.formData.start_time);
+            const endM = toMinutes(this.formData.end_time);
+            if (!(startM < endM)) {
+                alert('End time must be after start time.');
+                return;
+            }
+            const windowMins = endM - startM;
+            if (windowMins < dur) {
+                alert(`Time window (${windowMins} mins) is smaller than duration (${dur} mins). Please extend the end time or reduce duration.`);
+                return;
+            }
+            const createdDate = this.formData.date;
+            const payload = { ...this.formData, duration_minutes: dur, apply_to_next_days: !!this.applyToNextDays };
+            try {
+                await http.post('/doctor/api/availability', payload);
+            } catch (e) {
+                console.error(e);
+                alert((e && e.response && e.response.data && e.response.data.message) || 'Failed to set availability');
+                return;
+            }
+            this.formData = { date: '', start_time: '', end_time: '', duration_minutes: 30 };
+            await this.loadAvailability();
+            // If the created date is available, select it and load slots
+            if (createdDate && this.availabilityDates.includes(createdDate)) {
+                this.slotsDate = createdDate;
+                await this.loadSlotsDirect();
+            }
+        },
+        async deleteAvailability(id) {
+            await http.delete(`/doctor/api/availability/${id}`);
+            this.loadAvailability();
+        }
+    }
+}).mount('#app');
+</script>
+{% endblock %}

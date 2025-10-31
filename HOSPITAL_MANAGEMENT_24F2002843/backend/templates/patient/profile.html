@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div id="app" v-cloak>
+    {% raw %}
+    <div class="container-fluid">
+        <div class="row">
+            <nav class="col-md-2 d-md-block bg-light sidebar">
+                <div class="position-sticky pt-3">
+                    <h5 class="px-3"><i class="bi bi-hospital"></i> HMS Patient</h5>
+                    <ul class="nav flex-column">
+                        <li class="nav-item"><a class="nav-link" href="/patient/dashboard"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/patient/book-appointment"><i class="bi bi-calendar-plus"></i> Book Appointment</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/patient/appointments"><i class="bi bi-calendar-check"></i> My Appointments</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/patient/history"><i class="bi bi-clock-history"></i> Medical History</a></li>
+                        <li class="nav-item"><a class="nav-link active" href="/patient/profile"><i class="bi bi-person-circle"></i> Profile</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/logout"><i class="bi bi-box-arrow-right"></i> Logout</a></li>
+                    </ul>
+                </div>
+            </nav>
+
+            <main class="col-md-10 ms-sm-auto px-md-4">
+                <div class="pt-3 pb-2 mb-3 border-bottom"><h1 class="h2">My Profile</h1></div>
+                
+                <div class="card">
+                    <div class="card-body">
+                        <div v-if="message" :class="'alert alert-' + messageType">{{ message }}</div>
+                        
+                        <form @submit.prevent="updateProfile">
+                            <div class="mb-3">
+                                <label class="form-label">Name</label>
+                                <input type="text" class="form-control" v-model="profile.name" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Contact</label>
+                                <input type="text" class="form-control" v-model="profile.contact">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Date of Birth</label>
+                                <input type="date" class="form-control" v-model="profile.date_of_birth">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Blood Group</label>
+                                <input type="text" class="form-control" v-model="profile.blood_group">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Address</label>
+                                <textarea class="form-control" v-model="profile.address" rows="2"></textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Emergency Contact</label>
+                                <input type="text" class="form-control" v-model="profile.emergency_contact">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">New Password (leave blank to keep current)</label>
+                                <input type="password" class="form-control" v-model="newPassword">
+                            </div>
+                            <button type="submit" class="btn btn-primary">Update Profile</button>
+                        </form>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+    {% endraw %}
+    <script id="profile-json" type="application/json">{{ profile_data | tojson | safe }}</script>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const { createApp } = Vue;
+createApp({
+    data() {
+        let serverProfile = {};
+        const el = document.getElementById('profile-json');
+        if (el && el.textContent) {
+            try { serverProfile = JSON.parse(el.textContent); } catch (e) { serverProfile = {}; }
+        }
+        return { profile: serverProfile, newPassword: '', message: '', messageType: '' }
+    },
+    mounted() {
+        if (!this.profile || Object.keys(this.profile).length === 0) {
+            this.loadProfile();
+        }
+    },
+    methods: {
+        async loadProfile() {
+            const response = await http.get('/patient/api/profile');
+            this.profile = response.data;
+        },
+        async updateProfile() {
+            const data = { ...this.profile };
+            if (this.newPassword) data.password = this.newPassword;
+            const response = await http.put('/patient/api/profile', data);
+            this.message = response.data.message;
+            this.messageType = 'success';
+            this.newPassword = '';
+        }
+    }
+}).mount('#app');
+</script>
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <nav class="col-md-2 d-md-block bg-light sidebar">
+            <div class="position-sticky pt-3">
+                <h5 class="px-3"><i class="bi bi-hospital"></i> HMS Doctor</h5>
+                <ul class="nav flex-column">
+                    <li class="nav-item"><a class="nav-link active" href="/doctor/dashboard"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/doctor/patients"><i class="bi bi-people"></i> Patients</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/doctor/treatment"><i class="bi bi-clipboard-pulse"></i> Treatment</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/doctor/availability"><i class="bi bi-clock"></i> Availability</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/doctor/profile"><i class="bi bi-person-circle"></i> Profile</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/logout"><i class="bi bi-box-arrow-right"></i> Logout</a></li>
+                </ul>
+            </div>
+        </nav>
+
+        <main class="col-md-10 ms-sm-auto px-md-4">
+            <!-- Vue SFC mounts here; sidebar stays intact -->
+            <div id="doctor-dashboard-app" v-cloak></div>
+        </main>
+    </div>
+</div>
+
+{% block page_assets %}
+<script src="/static/main.js"></script>
+{% endblock %}
+{% endblock %}

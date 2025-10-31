@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div id="app" v-cloak>
+    {% raw %}
+    <div class="container-fluid">
+        <div class="row">
+            <nav class="col-md-2 d-md-block bg-light sidebar">
+                <div class="position-sticky pt-3">
+                    <h5 class="px-3"><i class="bi bi-hospital"></i> HMS Admin</h5>
+                    <ul class="nav flex-column">
+                        <li class="nav-item"><a class="nav-link" href="/admin/dashboard"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/admin/doctors"><i class="bi bi-person-badge"></i> Doctors</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/admin/patients"><i class="bi bi-people"></i> Patients</a></li>
+                        <li class="nav-item"><a class="nav-link active" href="/admin/appointments"><i class="bi bi-calendar-check"></i> Appointments</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/admin/profile"><i class="bi bi-person-circle"></i> Profile</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/logout"><i class="bi bi-box-arrow-right"></i> Logout</a></li>
+                    </ul>
+                </div>
+            </nav>
+
+            <main class="col-md-10 ms-sm-auto px-md-4">
+                <div class="pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2">All Appointments</h1>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr><th>ID</th><th>Patient</th><th>Doctor</th><th>Date</th><th>Time</th><th>Status</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="apt in appointments" :key="apt.id">
+                                <td>{{ apt.id }}</td>
+                                <td>{{ apt.patient_name }}</td>
+                                <td>{{ apt.doctor_name }}</td>
+                                <td>{{ apt.date }}</td>
+                                <td>{{ apt.time }}</td>
+                                <td><span :class="'badge bg-' + getStatusColor(apt.status)">{{ apt.status }}</span></td>
+                                <td>
+                                    <button class="btn btn-sm btn-info" @click="openAppointmentModal(apt)"><i class="bi bi-eye"></i> View</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Appointment view modal moved inside #app so Vue controls its bindings -->
+    <div class="modal fade" id="appointmentViewModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Appointment Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div v-if="selectedAppointment">
+                        <p><strong>ID:</strong> {{ selectedAppointment.id }}</p>
+                        <p><strong>Patient:</strong> {{ selectedAppointment.patient_name }}</p>
+                        <p><strong>Doctor:</strong> {{ selectedAppointment.doctor_name }}</p>
+                        <p><strong>Date:</strong> {{ selectedAppointment.date }}</p>
+                        <p><strong>Time:</strong> {{ selectedAppointment.time }}</p>
+                        <p><strong>Status:</strong> <span :class="'badge bg-' + getStatusColor(selectedAppointment.status)">{{ selectedAppointment.status }}</span></p>
+                        <p><strong>Reason:</strong> {{ selectedAppointment.reason || 'N/A' }}</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endraw %}
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const { createApp } = Vue;
+createApp({
+    data() {
+        return { appointments: [], selectedAppointment: null }
+    },
+    mounted() {
+        this.loadAppointments();
+    },
+    methods: {
+        async loadAppointments() {
+            const response = await http.get('/admin/api/appointments');
+            this.appointments = response.data;
+        },
+        getStatusColor(status) {
+            return status === 'Booked' ? 'primary' : status === 'Completed' ? 'success' : 'danger';
+        },
+        openAppointmentModal(apt) {
+            this.selectedAppointment = { ...apt };
+            const modalEl = new bootstrap.Modal(document.getElementById('appointmentViewModal'));
+            modalEl.show();
+        }
+    }
+}).mount('#app');
+</script>
+{% endblock %}
