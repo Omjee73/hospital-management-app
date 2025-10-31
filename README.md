@@ -1,4 +1,4 @@
-#Hospital Management System (Flask + Vue CDN)
+## Hospital Management System (Flask + Vue CDN)
 
 A complete HMS built with Flask on the backend and Vue 3 (via CDN) on the frontend. This single README consolidates everything: folders, technologies, how and where they’re used, why certain choices were made, and step‑by‑step run instructions for Windows PowerShell.
 
