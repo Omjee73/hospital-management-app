@@ -195,3 +195,47 @@ Default admin (seeded):
 
 This document is the single source of truth for the project. If you need deeper details, check the specific files referenced above.
 
+## Getting started
+
+### Prerequisites
+
+- Python 3.11+ with a virtual environment (recommended).
+
+### Setup and run
+
+1. Create and activate a virtual environment from the repository root:
+
+    ```powershell
+    python -m venv .venv
+    & .venv\Scripts\Activate.ps1
+    ```
+
+2. Install dependencies:
+
+    ```powershell
+    pip install -r requirements.txt
+    ```
+
+3. Run the app:
+
+    ```powershell
+    cd HOSPITAL_MANAGEMENT_24F2002843\backend
+    python app.py
+    ```
+
+4. Open **http://127.0.0.1:5000/**. The SQLite database (`hospital.db`) is created automatically at `HOSPITAL_MANAGEMENT_24F2002843\backend\instance\hospital.db`.
+
+5. Default admin (seeded on first run): `admin@hospital.com` / `admin123`.
+
+Optional Redis + Celery (for reminders/reports/exports):
+
+```powershell
+redis-server  # in another terminal
+cd HOSPITAL_MANAGEMENT_24F2002843\backend
+python -m celery -A celery_tasks worker --loglevel=info -P solo
+```
+
+## Contributing
+
+Fork the repository, make the change, and open a pull request against `main` with a short description of what changed and how it was tested.
+
